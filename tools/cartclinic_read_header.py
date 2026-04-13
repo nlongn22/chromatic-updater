@@ -28,11 +28,13 @@ from dataclasses import dataclass
 
 CMD_LOOPBACK = 0x01
 CMD_READ_CART_BYTE = 0x02
+CMD_WRITE_CART_BYTE = 0x03
 CMD_DETECT_CART = 0x05
 
 REPLY_LEN = {
     CMD_LOOPBACK: 4,
     CMD_READ_CART_BYTE: 4,
+    CMD_WRITE_CART_BYTE: 4,
     CMD_DETECT_CART: 4,
 }
 
@@ -175,6 +177,18 @@ def read_cart_byte(port: SerialPort, addr: int) -> int:
     if reply_addr != addr:
         raise RuntimeError(f"ReadCartByte address mismatch: got 0x{reply_addr:04X}, wanted 0x{addr:04X}")
     return data
+
+
+def write_cart_byte(port: SerialPort, addr: int, data: int) -> None:
+    request = struct.pack("<BHB", CMD_WRITE_CART_BYTE, addr & 0xFFFF, data & 0xFF)
+    reply = port.transact(CMD_WRITE_CART_BYTE, request)
+    cmd, reply_addr, reply_data = struct.unpack("<BHB", reply)
+    if cmd != CMD_WRITE_CART_BYTE:
+        raise RuntimeError(f"Unexpected WriteCartByte reply id: 0x{cmd:02X}")
+    if reply_addr != addr:
+        raise RuntimeError(f"WriteCartByte address mismatch: got 0x{reply_addr:04X}, wanted 0x{addr:04X}")
+    if reply_data != (data & 0xFF):
+        raise RuntimeError(f"WriteCartByte data mismatch: got 0x{reply_data:02X}, wanted 0x{data & 0xFF:02X}")
 
 
 def read_header(port: SerialPort) -> bytes:

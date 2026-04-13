@@ -110,7 +110,7 @@ For traditional Game Boy / Game Boy Color ROM header reads, the first experiment
 Run:
 
 ```bash
-python3 tools/cartclinic_read_header.py --port /dev/cu.usbmodemXXXX --dump-header /tmp/gb_header.bin
+python3 tools/cartclinic_read_header.py --port /dev/cu.usbmodemXXXX --dump-header ~/Downloads/gb_header.bin
 ```
 
 Expected successful output:
@@ -184,6 +184,12 @@ python3 tools/cartclinic_enter_mode.py
 
 After this SRAM load succeeds, rerun the read-only header probe.
 
+The host-side exit helper resets the FPGA when Cart Clinic work is done:
+
+```bash
+python3 tools/cartclinic_exit_mode.py
+```
+
 Observed failed setup attempt:
 
 ```text
@@ -220,3 +226,64 @@ Header:
 ```
 
 This confirms the safe read-only path works once Cart Clinic FPGA SRAM mode is loaded.
+
+## Traditional GB/GBC Save Backup
+
+`tools/cartclinic_backup_save.py` backs up external battery-backed RAM from traditional GB/GBC cartridges after Cart Clinic mode is loaded.
+
+Supported cartridge families:
+
+- MBC1: cartridge types `0x01`, `0x02`, `0x03`
+- MBC2: cartridge types `0x05`, `0x06`
+- MBC3: cartridge types `0x0F`, `0x10`, `0x11`, `0x12`, `0x13`
+- MBC5: cartridge types `0x19`, `0x1A`, `0x1B`, `0x1C`, `0x1D`, `0x1E`
+
+The tool infers save size from header RAM size codes:
+
+| RAM code | Size |
+| --- | --- |
+| `0x00` | no external RAM |
+| `0x01` | 2 KiB |
+| `0x02` | 8 KiB |
+| `0x03` | 32 KiB |
+| `0x04` | 128 KiB |
+| `0x05` | 64 KiB |
+
+For MBC2, it reads the 512-byte built-in RAM area and masks each byte to the lower nibble.
+
+Command:
+
+```bash
+python3 tools/cartclinic_backup_save.py --port /dev/cu.usbmodem0123456783
+```
+
+This sends MBC control-register writes to expose save RAM:
+
+- RAM enable: write `0x0A` to `0x0000`
+- MBC1 RAM banking mode when needed: write `0x01` to `0x6000`
+- RAM bank select when needed: write bank number to `0x4000`
+- RAM disable after read: write `0x00` to `0x0000`
+
+It does not write save RAM contents, erase flash, restore saves, or modify cartridge ROM.
+
+Observed successful save backup for `TETRIS DX`:
+
+```text
+Opening /dev/cu.usbmodem0123456783 at 115200 baud
+Loopback: ok
+DetectCart: inserted=True removed=False
+Cartridge:
+  title: 'TETRIS DX'
+  cart_type: 0x03 (MBC1)
+  ram_size: 0x02
+  backup_size: 8192 bytes
+Reading save bank 1/1 (8192 bytes)
+Wrote save backup: /Users/ngoclongnguyen/Downloads/tetris_dx.sav (8192 bytes)
+```
+
+A second backup matched byte-for-byte:
+
+```text
+40635a3f422766433bd3aeaa1e45c2b2bb87ac423c92cc0682069a27408eeef2  tetris_dx.sav
+40635a3f422766433bd3aeaa1e45c2b2bb87ac423c92cc0682069a27408eeef2  tetris_dx_2.sav
+```
