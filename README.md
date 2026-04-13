@@ -23,6 +23,7 @@ Keep each command on one shell line, or use a trailing `\` for line continuation
 If the read commands time out with empty replies, load the Cart Clinic FPGA SRAM image first:
 
 ```bash
+python3 tools/cartclinic_doctor.py
 python3 tools/cartclinic_enter_mode.py
 python3 tools/cartclinic_read_header.py --port /dev/cu.usbmodemXXXX --timeout 5 --dump-header ~/Downloads/gb_header.bin
 ```

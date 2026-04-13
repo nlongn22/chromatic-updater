@@ -128,7 +128,7 @@ With Chromatic visible on macOS as:
 
 - USB product: `Chromatic - Player 01`
 - USB vendor: `ModRetro`
-- serial port: `/dev/cu.usbmodem0123456783`
+- serial port: `/dev/cu.usbmodemXXXX`
 
 Running the first probe after opening MRUpdater's Cart Clinic tab and then quitting MRUpdater produced:
 
@@ -141,9 +141,9 @@ That means the host opened the visible Chromatic serial port, wrote the `Loopbac
 Next diagnostics:
 
 ```bash
-python3 tools/cartclinic_read_header.py --port /dev/cu.usbmodem0123456783 --timeout 5 --probe loopback
-python3 tools/cartclinic_read_header.py --port /dev/cu.usbmodem0123456783 --timeout 5 --probe detect --skip-loopback
-python3 tools/cartclinic_read_header.py --port /dev/cu.usbmodem0123456783 --timeout 5 --skip-loopback --skip-detect
+python3 tools/cartclinic_read_header.py --port /dev/cu.usbmodemXXXX --timeout 5 --probe loopback
+python3 tools/cartclinic_read_header.py --port /dev/cu.usbmodemXXXX --timeout 5 --probe detect --skip-loopback
+python3 tools/cartclinic_read_header.py --port /dev/cu.usbmodemXXXX --timeout 5 --skip-loopback --skip-detect
 ```
 
 If all three time out with empty tails, reverse MRUpdater's Cart Clinic setup/firmware-loading path before further read experiments.
@@ -158,10 +158,12 @@ MRUpdater does not just open the MCU serial port. Before creating the Cart Clini
 4. Sleep for 5 seconds.
 5. Open the MCU serial port at 115200 baud and create the Cart Clinic session.
 
+`gwu2x` is the openFPGALoader cable/driver name for the Gowin USB endpoint, not a per-device serial number.
+
 Observed local firmware cache:
 
 ```text
-/var/folders/8w/xtm3b_893493gs6qbc8pn3nm0000gn/T/firmware/chromatic/cartclinic/v1.1.zip
+$TMPDIR/firmware/chromatic/cartclinic/v1.1.zip
 ```
 
 That zip contains:
@@ -213,7 +215,7 @@ Cart Clinic SRAM load complete.
 Then:
 
 ```text
-Opening /dev/cu.usbmodem0123456783 at 115200 baud
+Opening /dev/cu.usbmodemXXXX at 115200 baud
 Loopback: ok
 DetectCart: inserted=True removed=False
 Header:
@@ -254,7 +256,7 @@ For MBC2, it reads the 512-byte built-in RAM area and masks each byte to the low
 Command:
 
 ```bash
-python3 tools/cartclinic_backup_save.py --port /dev/cu.usbmodem0123456783
+python3 tools/cartclinic_backup_save.py --port /dev/cu.usbmodemXXXX
 ```
 
 This sends MBC control-register writes to expose save RAM:
@@ -269,7 +271,7 @@ It does not write save RAM contents, erase flash, restore saves, or modify cartr
 Observed successful save backup for `TETRIS DX`:
 
 ```text
-Opening /dev/cu.usbmodem0123456783 at 115200 baud
+Opening /dev/cu.usbmodemXXXX at 115200 baud
 Loopback: ok
 DetectCart: inserted=True removed=False
 Cartridge:
@@ -278,7 +280,7 @@ Cartridge:
   ram_size: 0x02
   backup_size: 8192 bytes
 Reading save bank 1/1 (8192 bytes)
-Wrote save backup: /Users/ngoclongnguyen/Downloads/tetris_dx.sav (8192 bytes)
+Wrote save backup: ~/Downloads/tetris_dx.sav (8192 bytes)
 ```
 
 A second backup matched byte-for-byte:

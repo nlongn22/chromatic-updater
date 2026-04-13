@@ -46,10 +46,19 @@ def find_openfpgaloader() -> str | None:
 
 
 def find_cartclinic_zip() -> str | None:
-    candidates = glob.glob(
-        "/var/folders/*/*/T/firmware/chromatic/cartclinic/*.zip",
-        recursive=False,
-    )
+    temp_roots = [tempfile.gettempdir()]
+    if os.environ.get("TMPDIR"):
+        temp_roots.append(os.environ["TMPDIR"])
+
+    candidates: list[str] = []
+    for temp_root in dict.fromkeys(temp_roots):
+        candidates.extend(glob.glob(os.path.join(temp_root, "firmware/chromatic/cartclinic/*.zip")))
+
+    if not candidates:
+        candidates = glob.glob(
+            "/var/folders/*/*/T/firmware/chromatic/cartclinic/*.zip",
+            recursive=False,
+        )
     if not candidates:
         candidates = glob.glob("/tmp/firmware/chromatic/cartclinic/*.zip")
     return sorted(candidates)[-1] if candidates else None

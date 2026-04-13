@@ -55,13 +55,21 @@ ls /dev/cu.usbmodem* /dev/tty.usbmodem*
 Example:
 
 ```text
-/dev/cu.usbmodem0123456783
-/dev/tty.usbmodem0123456783
+/dev/cu.usbmodemXXXX
+/dev/tty.usbmodemXXXX
 ```
 
 Use the `/dev/cu.usbmodem...` path in commands below.
 
 ## 4. Enter Cart Clinic Mode
+
+Run the preflight check:
+
+```bash
+python3 tools/cartclinic_doctor.py
+```
+
+It checks for MRUpdater's `openFPGALoader`, cached Cart Clinic firmware, the Chromatic serial port, and both USB endpoints.
 
 Load the temporary Cart Clinic FPGA image into SRAM:
 
@@ -74,6 +82,8 @@ This mirrors MRUpdater's setup step:
 ```text
 openFPGALoader --cable gwu2x --write-sram --skip-reset cart_clinic_*.fs
 ```
+
+`gwu2x` is the openFPGALoader cable/driver name for the Gowin USB endpoint. It is not a unique serial number, so different Chromatic units should use the same value.
 
 It writes FPGA SRAM only. It does not write cartridge data, FPGA flash, or MCU flash.
 
