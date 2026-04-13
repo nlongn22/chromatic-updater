@@ -38,6 +38,7 @@ REPLY_LEN = {
 
 GB_HEADER_START = 0x0100
 GB_HEADER_END_EXCLUSIVE = 0x0150
+PROBE_CHOICES = ("loopback", "detect", "header")
 
 
 @dataclass
@@ -208,6 +209,22 @@ def main() -> int:
     parser.add_argument("--port", help="Serial port, e.g. /dev/cu.usbmodemXXXX")
     parser.add_argument("--baud", type=int, default=115200)
     parser.add_argument("--timeout", type=float, default=1.0)
+    parser.add_argument(
+        "--probe",
+        choices=PROBE_CHOICES,
+        default="header",
+        help="Highest-level read-only probe to run. header runs loopback, detect, then header reads.",
+    )
+    parser.add_argument(
+        "--skip-loopback",
+        action="store_true",
+        help="Skip the loopback check and start with DetectCart or ReadCartByte.",
+    )
+    parser.add_argument(
+        "--skip-detect",
+        action="store_true",
+        help="Skip DetectCart and start directly with ReadCartByte header reads.",
+    )
     parser.add_argument("--dump-header", help="Optional path to write the raw 0x0100-0x014F header bytes")
     args = parser.parse_args()
 
@@ -217,13 +234,35 @@ def main() -> int:
         return 2
 
     print(f"Opening {port_path} at {args.baud} baud")
-    with SerialPort(port_path, args.baud, args.timeout) as port:
-        print(f"Loopback: {'ok' if loopback(port) else 'failed'}")
-        inserted, removed = detect_cart(port)
-        print(f"DetectCart: inserted={inserted} removed={removed}")
+    try:
+        with SerialPort(port_path, args.baud, args.timeout) as port:
+            if not args.skip_loopback:
+                print(f"Loopback: {'ok' if loopback(port) else 'failed'}")
+            else:
+                print("Loopback: skipped")
 
-        header = read_header(port)
-        info = parse_header(header)
+            if args.probe == "loopback":
+                return 0
+
+            if not args.skip_detect:
+                inserted, removed = detect_cart(port)
+                print(f"DetectCart: inserted={inserted} removed={removed}")
+            else:
+                print("DetectCart: skipped")
+
+            if args.probe == "detect":
+                return 0
+
+            header = read_header(port)
+            info = parse_header(header)
+    except TimeoutError as exc:
+        print(f"Timeout: {exc}", file=sys.stderr)
+        print(
+            "No Cart Clinic reply was received. The Chromatic may not be in Cart Clinic "
+            "protocol mode, or another process may be consuming the serial replies.",
+            file=sys.stderr,
+        )
+        return 1
 
     if args.dump_header:
         with open(args.dump_header, "wb") as f:

@@ -121,3 +121,102 @@ Expected successful output:
 - Game Boy header checksum reports `ok`
 
 If the script times out, the Chromatic is probably not in Cart Clinic FPGA mode yet. In that case, start MRUpdater's Cart Clinic setup first, or reverse the Cart Clinic firmware loading path next.
+
+## Observed Test Result
+
+With Chromatic visible on macOS as:
+
+- USB product: `Chromatic - Player 01`
+- USB vendor: `ModRetro`
+- serial port: `/dev/cu.usbmodem0123456783`
+
+Running the first probe after opening MRUpdater's Cart Clinic tab and then quitting MRUpdater produced:
+
+```text
+Timeout: Timed out waiting for reply 0x01; tail_hex= tail_ascii=''
+```
+
+That means the host opened the visible Chromatic serial port, wrote the `Loopback` frame, and received zero bytes. Current interpretation: the port is likely correct, but the device was not answering the raw Cart Clinic command protocol after MRUpdater closed.
+
+Next diagnostics:
+
+```bash
+python3 tools/cartclinic_read_header.py --port /dev/cu.usbmodem0123456783 --timeout 5 --probe loopback
+python3 tools/cartclinic_read_header.py --port /dev/cu.usbmodem0123456783 --timeout 5 --probe detect --skip-loopback
+python3 tools/cartclinic_read_header.py --port /dev/cu.usbmodem0123456783 --timeout 5 --skip-loopback --skip-detect
+```
+
+If all three time out with empty tails, reverse MRUpdater's Cart Clinic setup/firmware-loading path before further read experiments.
+
+## Cart Clinic Mode Setup
+
+MRUpdater does not just open the MCU serial port. Before creating the Cart Clinic serial session, it loads a Cart Clinic FPGA image into Chromatic SRAM:
+
+1. Download Cart Clinic firmware from the ModRetro update bucket.
+2. Unzip the package.
+3. Run `openFPGALoader --cable gwu2x --write-sram --skip-reset <cart_clinic_*.fs>`.
+4. Sleep for 5 seconds.
+5. Open the MCU serial port at 115200 baud and create the Cart Clinic session.
+
+Observed local firmware cache:
+
+```text
+/var/folders/8w/xtm3b_893493gs6qbc8pn3nm0000gn/T/firmware/chromatic/cartclinic/v1.1.zip
+```
+
+That zip contains:
+
+```text
+cart_clinic_250412.fs
+```
+
+MRUpdater's bundled `openFPGALoader` is at:
+
+```text
+/Volumes/MRUpdater/MRUpdater.app/Contents/Frameworks/lib/openFPGALoader/openFPGALoader
+```
+
+The host-side setup helper is:
+
+```bash
+python3 tools/cartclinic_enter_mode.py
+```
+
+After this SRAM load succeeds, rerun the read-only header probe.
+
+Observed failed setup attempt:
+
+```text
+openFPGALoader --cable gwu2x --write-sram --skip-reset cart_clinic_250412.fs
+empty
+write to ram
+No USB devices found
+JTAG init failed with: No cable found
+```
+
+Immediately after this, neither `/dev/cu.usbmodem*` nor the USB `GWU2X`/`Chromatic - Player 01` devices were visible in macOS. Replug or power-cycle the Chromatic before retrying `cartclinic_enter_mode.py`.
+
+Observed successful setup/read attempt after reconnecting correctly:
+
+```text
+openFPGALoader --cable gwu2x --write-sram --skip-reset cart_clinic_250412.fs
+Load SRAM: 100.00%
+Cart Clinic SRAM load complete.
+```
+
+Then:
+
+```text
+Opening /dev/cu.usbmodem0123456783 at 115200 baud
+Loopback: ok
+DetectCart: inserted=True removed=False
+Header:
+  title: 'TETRIS DX'
+  cgb_flag: 0x80
+  cart_type: 0x03
+  rom_size: 0x04
+  ram_size: 0x02
+  header_checksum: 0x30 (ok)
+```
+
+This confirms the safe read-only path works once Cart Clinic FPGA SRAM mode is loaded.
